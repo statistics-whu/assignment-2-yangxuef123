@@ -1,0 +1,584 @@
+---
+title: "第二次作业"
+author:
+- 杨雪枫
+- 2024281050971
+CJKmainfont: 宋体
+output:
+  pdf_document:
+    fig_caption: true
+    number_sections: true
+    toc: true
+    latex_engine: xelatex
+  rticles::ctex:
+    fig_caption: true
+    number_sections: true
+    toc: true
+  word_document:
+    toc: true
+documentclass: ctexart
+---
+```{r include = FALSE,echo = FALSE}
+knitr::opts_chunk$set(echo = FALSE,error = FALSE, warning = FALSE, message = FALSE,
+                      out.width = "100%", split = FALSE, fig.align = "center")
+
+library(tidyverse)
+library(readxl)
+library(lubridate)
+library(DescTools)
+library(gridExtra)
+library(kableExtra)
+library(showtext)
+
+showtext_auto()
+font_add("幼圆","C:/Windows/Fonts/SIMYOU.TTF")
+
+getwd()
+setwd("F:/project/statics_work2")
+```
+
+# Question 1: BigBangTheory
+
+```{r echo = FALSE}
+# 设置区域格式，否则"September"不识别
+Sys.setlocale("LC_TIME", "en_US.UTF-8")
+
+# 数据读取和处理
+BBT <- read.csv("./BigBangTheory.csv",check.names = FALSE,sep = ",")
+BBT$`Air Date`<- as.Date(BBT$`Air Date`,format = "%B %d, %Y")
+
+BBT <- BBT %>% rename(viewers = `Viewers (millions)`,
+                      air_date = `Air Date`)
+```
+## a 计算viewers最小值和最大值
+  viewers最小值是`r min(BBT$viewers)`,最大值是`r max(BBT$viewers)`
+
+## b 计算均值、中位数和众数
+  viewers均值是`r mean(BBT$viewers)`,中位数是`r median(BBT$viewers)`，众数是`r as.numeric(names(which.max(table(BBT$viewers))))`
+
+## c 计算第一和第三分位数
+  viewers第一和第三分位数是`r quantile(BBT$viewers,c(0.25,0.75))`
+
+## d 说明2011-12季观众人数是增长还是下降？
+```{r echo = FALSE}
+ggplot(BBT[-1,],aes(air_date,viewers))+
+  geom_point()+
+  geom_line()+
+  geom_smooth()
+```
+  2011-2012年收视人数呈现先增长后下降的趋势
+
+
+# Question 2: NBAPlayerPts
+```{r echo = FALSE}
+# 数据读取和处理
+NBA <- read.csv("./NBAPlayerPts.csv",sep = ",")
+```
+## a 展示数据频数分布
+```{r echo = FALSE}
+# 频数分布
+freq_ppg <- table(cut(NBA$PPG, breaks = seq(10,30,by = 2), include.lowest = TRUE, right = FALSE))
+freq_ppg
+```
+
+## b 展示相对频率分布
+```{r echo = FALSE}
+freq_ppg <- Freq(NBA$PPG,breaks = seq(10,30,by = 2),include.lowest = TRUE, right = FALSE)
+
+png("./频数分布.png")
+p <- tableGrob(freq_ppg)
+grid.arrange(p)
+dev.off()
+```
+![相对频率分布](频数分布.png)
+
+## c 展示累积频率分布
+
+![累积频率分布](频数分布.png)
+
+## d 画PPG直方图
+```{r echo = FALSE}
+hist(NBA$PPG)
+```
+
+## e 数据是否存在偏态
+  数据偏态系数为`r round(e1071::skewness(NBA$PPG),2)`大于0，及从直方图观察，数据为正偏
+
+## f PPG至少为20的球员比例
+```{r echo = FALSE}
+# 求均值、标准差
+sd_ppg <- var(NBA$PPG)
+mean_ppg <- mean(NBA$PPG)
+n <- length(NBA$PPG)
+
+# 求比例
+cat(round((pnorm((20-mean_ppg)*sqrt(n)/sd_ppg,lower.tail = FALSE))*100,2),"%")
+```
+
+
+# Question 3
+## a 本次调查中使用的样本有多大？
+```{r echo = FALSE}
+sem <- 20
+sd_p <- 500
+
+n_sample <- (sd_p/sem)^2
+```
+  本次调查使用的样本量为`r (sd_p/sem)^2`
+
+## b. 点估计值在总体平均值±25以内的概率是多少？
+```{r echo = FALSE}
+cat(round((1-2*pnorm(-25/sem))*100,2),"%")
+```
+
+
+# Question 4 Professional
+```{r echo = FALSE}
+### 导入数据
+ypm <- read.csv("./Professional.csv",check.names = FALSE)
+### 数据处理
+ypm <- subset(ypm,select = -(9:14))
+```
+
+## a描述性统计
+```{r echo = FALSE}
+str(ypm)
+
+summary(ypm)
+
+ypm %>% 
+  head(10) %>%
+  kable(caption = "YPM杂志客户") %>% 
+  kable_styling(latex_options = c("striped", "scale_down"),font_size = 8)
+```
+  数据包括了8个变量，年龄Q1分位数是28，均值30，Q3分位数33，最大年龄42岁
+  
+  金融投资Q1分位数是18300，均值28538大于中位数24800，Q3分位数34275，呈右偏分布
+
+  家庭收入Q1分位数是51625，均值74460，Q3分位数88775，呈右偏分布
+
+## b 95% confidence intervals for the mean age and household income of subscribers
+```{r echo = FALSE}
+### 均值
+mean_age <- mean(ypm$Age)
+mean_income <- mean(ypm$`Household Income ($)`)
+
+### 标准差
+sd_age <- sd(ypm$Age)
+sd_income <- sd(ypm$`Household Income ($)`)
+
+fun_ci_q4 <- function(mean,sd) {
+  num <- length(ypm$Age)
+  ci_low <- mean - qt(0.025,num-1,lower.tail = FALSE)*sd/sqrt(num)
+  ci_up <- mean + qt(0.025,num-1,lower.tail = FALSE)*sd/sqrt(num)
+  # 置信区间,t分布
+  ci <- c(round(ci_low,2),round(ci_up,2))
+}
+
+### 年龄置信区间
+### t分布
+ci_age <- fun_ci_q4(mean_age,sd_age)
+
+### 收入置信区间
+### t分布
+ci_income <- fun_ci_q4(mean_income,sd_income)
+```
+  年龄的95%置信区间是(`r ci_age`)
+  
+  收入的95%置信区间是(`r ci_income`)
+
+## c broadband and have children
+```{r echo = FALSE}
+### 筛选宽带和有孩子客户
+num_bb <- sum(ypm$`Broadband Access?` == "Yes" )
+num_child <- sum(ypm$`Have Children?` == "Yes" )
+
+fun_ci_prop <- function(a) {
+  num <- length(ypm$Age)
+  prop <- a/num
+  ci_prop_low <- prop - qt(0.025,num-1,lower.tail = FALSE)*sqrt(prop*(1-prop)/num)
+  ci_prop_up <- prop + qt(0.025,num-1,lower.tail = FALSE)*sqrt(prop*(1-prop)/num)
+  # 置信区间,t分布
+  ci_prop <- c(round(ci_prop_low,2),round(ci_prop_up,2))
+}
+
+### 宽带客户比例置信区间
+### t分布
+ci_bb <- fun_ci_prop(num_bb)
+
+### 有孩子客户比例置信区间
+### t分布
+ci_child <- fun_ci_prop(num_child)
+```
+  有宽带客户95%置信区间是(`r ci_bb`)
+  
+  有孩子客户95%置信区间是(`r ci_child`)
+
+## d. 对于线上经纪人来说，Young Professional是一个很好的广告渠道吗？
+  是的。Young Professional 杂志是一个好广告渠道。
+  
+  1. 62.4%的杂志订阅客户家里有宽带，可以进行线上交易。有宽带客户95%置信区间是(`r ci_bb`)
+  
+  2. 订阅客户家庭金融投资均值28538美元，家庭收入均值74460美元，Q3分位数88775美元
+  
+  3. 订阅客户平均每年做6笔金融交易
+  
+  这些条件对于在线经纪人来说，是一个很好的目标客户
+
+## e. 这本杂志是为销售教育软件和幼儿电脑游戏的公司做广告的好地方吗？
+  是的。
+  
+  1. 杂志订阅客户平均年龄为30岁，年龄的95%置信区间是(`r ci_age`)，比较年轻
+  
+  2. 62.4%的杂志订阅客户家里有宽带，可以进行线上交易。有宽带客户95%置信区间是(`r ci_bb`),可以安装软件和电脑游戏
+  
+  3. 超过53.4%的订阅客户有孩子，有孩子客户95%置信区间是(`r ci_child`),且订阅客户平均年龄30岁，推测小孩年龄不大，且在未来几年有小孩比例会继续上升。
+  
+  4. 订阅者家庭收入较高，平均收入74460美元，可以负担软件和游戏支出
+  
+  这些条件符合教育软件和幼儿电脑游戏的目标客户画像，因此杂志是一个很好的广告渠道
+
+## f. 评论一下你认为《Young Professional》的读者会感兴趣的文章类型。
+  杂志订阅客户平均年龄30岁，家庭平均收入74460美元，且年平均交易6次，平均金融投资2858美元，超过53.4%客户有孩子。是年轻中产阶级人群画像。
+  
+  因此，推测读者可能对金融资讯、地产投资与交易、互联网科技、教育育儿等相关文章感兴趣。
+  
+
+# Question 5:Quality
+```{r echo = FALSE}
+# 数据读取
+Q <- read.csv("./Quality.csv",check.names = FALSE)
+
+mu0 <- 12
+n_q <- 800
+num_q <- length(Q$`Sample 1`)
+sd_q <- 0.21
+```
+
+## a 1%显著性水平z检验
+```{r echo = FALSE}
+### sample1检验
+mean_s1 <- mean(Q$`Sample 1`)
+z1 <- (mean_s1-mu0)*sqrt(num_q)/sd_q
+p_value1 <- round(2*pnorm(abs(z1),lower.tail = FALSE),4)
+
+### sample2检验
+mean_s2 <- mean(Q$`Sample 2`)
+z2 <- (mean_s2-mu0)*sqrt(num_q)/sd_q
+p_value2 <- round(2*pnorm(abs(z2),lower.tail = FALSE),4)
+
+### sample3检验
+mean_s3 <- mean(Q$`Sample 3`)
+z3 <- (mean_s3-mu0)*sqrt(num_q)/sd_q
+p_value3 <- round(2*pnorm(abs(z3),lower.tail = FALSE),4)
+
+### sample4检验
+mean_s4 <- mean(Q$`Sample 4`)
+z4 <- (mean_s4-mu0)*sqrt(num_q)/sd_q
+p_value4 <- round(2*pnorm(abs(z4),lower.tail = FALSE),4)
+```
+  sample1的1%显著性水平p-value是`r p_value1`
+  
+  sample2的1%显著性水平p-value是`r p_value2`
+  
+  sample3的1%显著性水平p-value是`r p_value3`
+  
+  sample4的1%显著性水平p-value是`r p_value4`
+
+
+## b 计算每个样本的标准偏差。假设总体标准差为0.21是否合理？
+```{r echo = FALSE}
+sd_s1 <- round(sd(Q$`Sample 1`),2)
+sd_s2 <- round(sd(Q$`Sample 2`),2)
+sd_s3 <- round(sd(Q$`Sample 3`),2)
+sd_s4 <- round(sd(Q$`Sample 4`),2)
+```
+  sample1的标准差是`r sd_s1`
+  
+  sample2的标准差是`r sd_s2`
+  
+  sample3的标准差是`r sd_s3`
+  
+  sample4的标准差是`r sd_s4`
+  
+```{r echo = FALSE}
+### F检验
+### F统计量
+F1 <- sd_s1^2/sd_q^2
+F2 <- sd_s2^2/sd_q^2
+F3 <- sd_s3^2/sd_q^2
+F4 <- sd_s4^2/sd_q^2
+
+F_low <- qf(0.025,num_q-1,n_q-1)
+F_up <- qf(0.975,num_q-1,n_q-1)
+```
+  四个样本的标准差F统计量均位于95%置信水平(`r  c(round(F_low,2),round(F_up,2))`)之间，且95%置信水平包含1，说明总体标准差为0.21合理
+
+## c 95%置信区间
+```{r echo = FALSE}
+### sample置信区间
+### t分布
+ci_sample_low <- mu0 - qt(0.025,n_q-1,lower.tail = FALSE)*sd_q/sqrt(n_q)
+ci_sample_up <- mu0 + qt(0.025,n_q-1,lower.tail = FALSE)*sd_q/sqrt(n_q)
+ci_sample <- c(round(ci_sample_low,2),round(ci_sample_up,2))
+```
+  样本均值的95%置信区间是`r ci_sample`
+
+## d 第一类错误，第二类错误
+  第一类错误:原假设是正确的,却拒绝了原假设。概率为$\alpha$
+  
+  第二类错误:原假设是错误的,却没有拒绝原假设。概率为$1-\alpha$
+  
+  随着显著性水平的增加，第一类错误也会增加。
+
+# Question 6:Occupancy
+
+```{r echo = FALSE}
+occ <- read.csv("./Occupancy.csv",header = FALSE)
+### 数据处理
+occ <- occ[-1,]
+```
+
+## a 点估计 估计2007年3月第一周和2008年3月第一周租用比例。
+```{r echo = FALSE}
+num_07 <- length(occ$V1)-1
+num_08 <- sum(occ$V2 == "Yes") + sum(occ$V2 == "No")
+
+prop_07 <- round(sum(occ$V1 == "Yes")/num_07,3)
+prop_08 <- round(sum(occ$V2 == "Yes")/num_08,3)
+```
+  2007年3月第一周租用比例是`r prop_07`
+
+  2008年3月第一周租用比例是`r prop_08`
+
+## b 比例差异95%置信区间
+```{r echo = FALSE}
+prop_diff <- prop.test(c(sum(occ$V1 == "Yes"), sum(occ$V2 == "Yes")), c(num_07, num_08), correct = FALSE, conf.level = 0.95)
+round(prop_diff$conf.int,4)
+```
+
+## c 08年出租率是否上涨
+  是的。
+  
+  根据b 95%比例置信区间为不包含0，说明两者比例是有差异的，则2008年3月出租率大于2007年
+
+# Question 7:Training
+
+```{r echo = FALSE}
+train <- read.csv("./Training.csv")
+```
+## a、描述性统计
+```{r echo = FALSE}
+str(train)
+summary(train)
+```
+  
+  通过数据统计，使用当前的训练方法和拟提议的训练方法，学生训练时间的均值无变化，均为75小时；中位数无变化，均为76小时；其他分位数变化不大，整体看不出明显区别。
+
+## b 均值差异t检验
+
+```{r echo = FALSE}
+t.test(train$Current,train$Proposed,alternative = "two.sided",conf.level = 0.95)
+```
+  
+  根据t检验，$p-value = 0.5481$，不拒绝原假设，即：在0.05的显著性水平上，两组之间无差异。
+
+## c 计算方差、标准差，并对总体方差进行假设检验
+```{r echo = FALSE}
+var_cur <- var(train$Current)
+sd_cur <- sd(train$Current)
+var_pro <- var(train$Proposed)
+sd_pro <- sd(train$Proposed)
+```
+
+```{r echo = FALSE}
+### 方差分析F检验
+var.test(train$Current,train$Proposed,alternative = "two.sided",conf.level = 0.95)
+```
+
+  根据方差检验$p-value = 0.000578 < 0.05$，表明在0.05显著性水平下，两组标准差或方差具有显著性差异
+
+## d 对于这两种方法之间的任何差异，你能得出什么结论？你有什么建议？请解释。
+
+  根据t检验数据，这两种方法在训练平均时间上非常接近，差异的95%置信区间为-1.55至0.83小时。
+  
+  根据方差检验数据，这两种方法在标准差或者方差上有明显的差异，差异的95%置信区间为1.49至4.13,拟提议的训练方法具有更低的方差。根据拟提议的训练方法的方法，学生更有可能在大约相同的时间内完成培训。
+
+  综合以上，首选拟提议的训练方法。
+
+## e 在对未来使用的培训计划做出最终决定之前，你能建议其他可能需要的数据或测试吗？
+
+  根据目前数据，采用拟提议的训练方法，学生更有可能在大约相同的时间内完成培训。但是不知道两组通过考试的数据，因此建议收集两组考试结果数据，进行进一步的分析。
+
+
+# Question 8:Camry
+
+```{r echo = FALSE}
+car <- read.csv("./Camry.csv",check.names = FALSE,sep = ",")
+names(car) <- c("Miles","Price")
+```
+
+## a scatterplot
+```{r echo = FALSE}
+ggplot(car,aes(Miles,Price))+
+  geom_point()
+```
+
+## b 散点图相关关系
+  根据散点图，二手车价格和里程大致呈现负相关关系，即里程越长，价格倾向于越低
+
+## c 模型
+```{r echo = FALSE}
+mod_car <- lm(Price ~ Miles,data = car)
+summary(mod_car)
+```
+  Price = -0.05877 * Miles + 16.46976
+  
+  模型p值0.0003，Miles p值0.0003，是显著的，模型解释水平为51.15%
+
+## d 在0.05的显著性水平上检验显著性关系。
+  0.05显著性水平上$p-value = 0.0003 < α = 0.05$显著
+  
+## e 估计的回归方程是否提供了很好的拟合？解释一下。
+  预测方程解释水平为51.15%
+  
+## f 对估计回归方程的斜率进行解释。
+  斜率指每1000Miles，价格下降59美元
+  
+## 假设您正在考虑购买一辆已经行驶了60000英里的二手2007凯美瑞。使用第（c）部分中开发的估计回归方程，预测这辆车的价格。这是你给卖家的价格吗。
+  预测60,000英里二手凯美瑞价格是`r round(-0.05877 * 60 + 16.46976,1)`,这个价格不一定是实际卖价，因为模型解释能力只有51.15%，实际价格还受其他因素影响，模型不能完全预测价格，只能作为参考
+
+
+# Question 9:WE
+
+```{r echo = FALSE}
+we <- read_xlsx("./WE.xlsx") %>% 
+  set_names("id","churn","happy_index","happy_index_MoM","support","support_MoM"
+            ,"service","service_MoM","login","blog_MoM","vist_add","age","gap")  
+# 数据预处理
+we$churn <- as.factor(we$churn)
+```
+
+## a 流失客户与非流失客户可视化
+```{r echo = FALSE}
+glimpse(we)
+```
+
+```{r echo = FALSE}
+# 想要操作的变量名
+continuous_vars <- colnames(we[3:13])
+
+# 遍历所有数值型指标并创建可视化
+for (var in continuous_vars) {
+  if (var %in% names(we) && is.numeric(we[[var]])) {
+    p <- ggplot(we, aes_string(x = "as.factor(churn)" , y = var )) +
+      geom_boxplot() +
+      labs(title = paste( var, "按流失状态分布"),
+           x = "流失状态 (0 = 流失, 1 = 非流失)",
+           y = var) +
+      theme_minimal()
+    print(p)
+  }
+}
+
+result <- we %>% 
+  select(-id) %>%
+  group_by(churn) %>%
+  summarise(
+    happy_index = round(mean(happy_index, na.rm = TRUE),0),
+    happy_index_MoM = round(mean(happy_index_MoM, na.rm = TRUE),1),
+    support = round(mean(support, na.rm = TRUE),0),
+    support_MoM = round(mean(support_MoM, na.rm = TRUE),1),
+    service = round(mean(service, na.rm = TRUE),0),
+    service_MoM = round(mean(service_MoM, na.rm = TRUE),1),
+    login = round(mean(login, na.rm = TRUE),0),
+    blog_MoM = round(mean(blog_MoM, na.rm = TRUE),1),
+    vist_add = round(mean(vist_add, na.rm = TRUE),0),
+    age = round(mean(age, na.rm = TRUE),0),
+    gap = round(mean(gap, na.rm = TRUE),0)
+  ) %>% kable() %>% 
+  kable_styling(font_size = 8)
+
+# 打印结果
+result
+```
+
+  通过表格，在两种状态下，特征均值都有差异
+  
+  结合箱线图观察，客户支持相比上月的变化、服务优先级相比上月的变化、博客数相比上月的变化访问次数相比上月的增加这几个指标差异较小。
+
+## b 通过均值比较的方式验证上述不同是否显著
+```{r echo = FALSE}
+# 对3-13列进行t检验
+continuous_vars <- colnames(we[3:13])
+
+# 使用lapply函数进行批量t检验
+t_test_results <- lapply(continuous_vars, function(var) {
+  # 执行Welch t检验
+  test_result <- t.test(as.formula(paste(var, "~ churn")), data = we, var.equal = FALSE)
+    # 提取并整理检验结果
+  result_df <- data.frame(
+                          Variable = var,
+                          Statistic = round(test_result$statistic,3),
+                          P.Value = round(test_result$p.value,3),
+                          Conf.Int.Lower = round(test_result$conf.int[1],3),
+                          Conf.Int.Upper = round(test_result$conf.int[2],3),
+    stringsAsFactors = FALSE
+  )
+    return(result_df)
+})
+
+# 将所有检验结果合并为一个数据框
+t_test_results_combined <- do.call(rbind, t_test_results) %>% 
+  kable() %>% 
+  kable_styling(font_size = 8)
+
+# 打印合并后的检验结果
+t_test_results_combined
+```
+
+  从t检验结果，可以看到，除“support_MoM”（客户支持相比上月的变化）和“service_MoM”（服务优先级相比上月的变化）及“vist_add”（访问次数相比上月的增加）外，其他变量均显著。
+  
+  
+## c. 以”流失“为因变量，其他你认为重要的变量为自变量（提示：a、b两步的发现），建立回归方程对是否流失进行预测。
+```{r echo = FALSE}
+we_mod <- glm(churn ~ happy_index + happy_index_MoM + support + service + login
+              + blog_MoM + vist_add  + age + gap,
+             data = we,
+             family = binomial)
+summary(we_mod)
+```
+
+  根据结果，当月客户幸福指数、客户幸福指数相比上月变化、访问间隔变化在0.001显著性水平上是显著的。
+  
+  访问次数相比上月的增加和客户使用期限在0.01显著性水平上是显著的。
+  
+## d 根据上一步预测的结果，对尚未流失（流失=0）的客户进行流失可能性排序，并给出流失可能性最大的前100名用户ID列表。
+```{r echo = FALSE}
+# 筛选出未流失的客户,”1“表示不流失
+we_non <- filter(we,we$churn == "1")
+
+# 使用模型对未流失客户的流失概率进行预测
+# 注意：type = "response"表示输出预测的概率，而不是对数几率
+predicted_prob <- predict(we_mod, newdata = we_non, type = "response")
+
+# 将预测的概率与用户ID合并到一个数据框中,并降序
+predicted_df <- data.frame(
+  id = we_non$id,
+  predicted_prob = predicted_prob
+) %>% arrange(desc(predicted_prob))
+
+
+# 提取流失概率最高的前100名用户的ID
+top_100 <- predicted_df[1:100, "id"] 
+  
+top_100_users <- we %>% 
+  filter(id %in% top_100) %>%
+  kable() %>% kable_styling(font_size = 8)
+
+# 打印或保存前100名用户
+top_100_users
+```
+
+
+
